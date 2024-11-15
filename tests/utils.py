@@ -507,6 +507,47 @@ def make_test_arrow_table(output_path: Path) -> None:
     test_table = pa.Table.from_pydict(value_dict, schema=schema)
     parquet.write_table(test_table, str(output_path / 'test.parquet'))
 
+def make_test_arrow_table_from_pandas(output_path: Path) -> None:
+    import pyarrow as pa
+    from pyarrow import parquet
+    import pandas as pd
+
+    df = pd.DataFrame({
+            'c_id': [1, 2, 3, 4, 5],
+            'c_int64': [-10, -20, -30, -40, None],
+            'c_int32': [-1, -2, -3, -4, None],
+            'c_float32': [1.1, 2.2, 3.3, 4.4, None],
+            'c_string': ['aaa', 'bbb', 'ccc', 'ddd', None],
+            'c_boolean': [True, False, True, False, None],
+            'c_timestamp': [
+                datetime.datetime(2012, 1, 1, 12, 0, 0, 25),
+                datetime.datetime(2012, 1, 2, 12, 0, 0, 25),
+                datetime.datetime(2012, 1, 3, 12, 0, 0, 25),
+                datetime.datetime(2012, 1, 4, 12, 0, 0, 25),
+                None,
+            ],
+            'c_array_float32': [
+                [
+                    1.0,
+                    2.0,
+                ],
+                [
+                    10.0,
+                    20.0,
+                ],
+                [
+                    100.0,
+                    200.0,
+                ],
+                [
+                    1000.0,
+                    2000.0,
+                ],
+                [10000.0, 20000.0],
+            ],
+        })
+    test_table = pa.Table.from_pandas(df, preserve_index=False)
+    parquet.write_table(test_table, str(output_path / 'test_pd.parquet'))
 
 def assert_img_eq(img1: PIL.Image.Image, img2: PIL.Image.Image) -> None:
     assert img1.mode == img2.mode

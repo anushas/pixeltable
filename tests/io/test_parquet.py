@@ -1,8 +1,10 @@
 import pathlib
+import pytest
 
 import pixeltable as pxt
+from pixeltable import exceptions as excs
 
-from ..utils import make_test_arrow_table, skip_test_if_not_installed
+from ..utils import make_test_arrow_table, make_test_arrow_table_from_pandas, skip_test_if_not_installed
 
 
 class TestParquet:
@@ -40,3 +42,17 @@ class TestParquet:
                     assert val == arrow_tup[col].astimezone(None)
                 else:
                     assert val == arrow_tup[col]
+
+    def test_import_parquet_created_from_pandas(self, reset_db, tmp_path: pathlib.Path) -> None:
+        skip_test_if_not_installed('pyarrow')
+        import pyarrow as pa
+        from pyarrow import parquet
+        from pixeltable.utils.arrow import iter_tuples
+
+        parquet_dir = tmp_path / 'test_data'
+        parquet_dir.mkdir()
+        make_test_arrow_table_from_pandas(parquet_dir)
+
+        with pytest.raises(excs.Error,match='Could not infer pixeltable type for column c_int64 from parquet file'):
+            tab = pxt.io.import_parquet('test_pd_parquet', parquet_path=str(parquet_dir))
+
