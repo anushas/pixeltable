@@ -27,28 +27,29 @@ class TestIndex:
     def bad_embed2(x: str) -> pxt.Array[(None,), pxt.Float]:
         return np.zeros(10)
 
-    def test_similarity(self, small_img_tbl: pxt.Table, reload_tester: ReloadTester) -> None:
+    def _test_similarity_helper(self, use_index_name: bool, small_img_tbl: pxt.Table, reload_tester: ReloadTester) -> None:
         skip_test_if_not_installed('transformers')
         t = small_img_tbl
         sample_img = t.select(t.img).head(1)[0, 'img']
         _ = t.select(t.img.localpath).collect()
 
         for metric, is_asc in [('cosine', False), ('ip', False), ('l2', True)]:
-            t.add_embedding_index('img', metric=metric, image_embed=clip_img_embed, string_embed=clip_text_embed)
+            iname = 'idx_'+metric+'_'+str(is_asc) if use_index_name else None
+            t.add_embedding_index('img', idx_name=iname, metric=metric, image_embed=clip_img_embed, string_embed=clip_text_embed)
 
             df = (
-                t.select(img=t.img, sim=t.img.similarity(sample_img))
-                .order_by(t.img.similarity(sample_img), asc=is_asc)
+                t.select(img=t.img, sim=t.img.similarity(sample_img, idx=iname))
+                .order_by(t.img.similarity(sample_img, idx=iname), asc=is_asc)
                 .limit(1)
             )
             res = reload_tester.run_query(df)
             out_img = res[0, 'img']
-            assert_img_eq(sample_img, out_img), f'{metric} failed'
+            assert_img_eq(sample_img, out_img, f'{metric} failed when using index {iname}')
 
             # TODO:  how to verify the output?
             df = (
-                t.select(path=t.img.localpath, sim=t.img.similarity('parachute'))
-                .order_by(t.img.similarity('parachute'), asc=is_asc)
+                t.select(path=t.img.localpath, sim=t.img.similarity('parachute', idx=iname))
+                .order_by(t.img.similarity('parachute', idx=iname), asc=is_asc)
                 .limit(1)
             )
             _ = reload_tester.run_query(df)
@@ -60,6 +61,11 @@ class TestIndex:
             reload_tester.run_reload_test(clear=True)
 
             t.drop_embedding_index(column='img')
+
+    def test_similarity(self, small_img_tbl: pxt.Table, reload_tester: ReloadTester) -> None:
+        skip_test_if_not_installed('transformers')
+        self._test_similarity_helper(False, small_img_tbl, reload_tester)
+        self._test_similarity_helper(True, small_img_tbl, reload_tester)
 
     def test_query(self, reset_db) -> None:
         skip_test_if_not_installed('transformers')
