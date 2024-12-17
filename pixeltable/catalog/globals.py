@@ -70,6 +70,17 @@ class CreateType(enum.Enum):
     VIEW = 'view'
     SNAPSHOT = 'snapshot'
 
+class IfNotExistsParam(enum.Enum):
+    ERROR = 'error'
+    IGNORE = 'ignore'
+
+    @classmethod
+    def validated(cls, param_val: str, param_name: str) -> IfNotExistsParam:
+        try:
+            return cls[param_val.upper()]
+        except KeyError:
+            raise excs.Error(f'{param_name} must be one of: {[e.value for e in cls]}')
+
 def is_valid_identifier(name: str) -> bool:
     return name.isidentifier() and not name.startswith('_')
 
