@@ -6,7 +6,7 @@ import pytest
 import pixeltable as pxt
 import pixeltable.exceptions as excs
 
-from .utils import assert_resultset_eq, clip_img_embed, create_img_tbl, create_test_tbl, reload_catalog, ReloadTester
+from .utils import assert_resultset_eq, clip_img_embed, create_img_tbl, create_test_tbl, reload_catalog, ReloadTester, assert_raises_error
 
 class TestSnapshot:
     def run_basic_test(
@@ -91,6 +91,14 @@ class TestSnapshot:
                     query = tbl.where(tbl.c2 < 10) if has_filter else tbl
                     snap = pxt.create_snapshot(snap_path, query, additional_columns=schema)
                     self.run_basic_test(tbl, query, snap, extra_items=extra_items, reload_md=reload_md)
+
+        # adding column with same name as a base table column at
+        # the time of creating a snapshot will raise an error now.
+        tbl = create_test_tbl(name=tbl_path)
+        assert 'c1' in tbl.columns and type(tbl.c1.col.col_type) == pxt.StringType
+        with pytest.raises(excs.Error) as exc_info:
+            _ = pxt.create_snapshot('snap2', tbl, additional_columns={'c1': pxt.Int})
+        assert "Column 'c1' already exists in the base table" in str(exc_info.value)
 
     def __test_create_if_exists(self, sname: str, t: pxt.Table, s: pxt.Table) -> None:
         """ Helper function for testing if_exists parameter while creating a snaphot.
@@ -197,6 +205,12 @@ class TestSnapshot:
         with pytest.raises(pxt.Error) as excinfo:
             _ = snap.insert(c3=1.0)
         assert 'cannot insert into view' in str(excinfo.value).lower()
+
+        # adding column is not supported for snapshots
+        expected_msg = 'cannot add column to a snapshot'
+        assert_raises_error(expected_msg, snap.add_column, non_existing_col1=pxt.String)
+        assert_raises_error(expected_msg, snap.add_computed_column, non_existing_col1=tbl.c2 + tbl.c3)
+        assert_raises_error(expected_msg, snap.add_columns, {'non_existing_col1': pxt.String, 'non_existing_col2': pxt.String})
 
         with pytest.raises(pxt.Error) as excinfo:
             _ = snap.delete()
