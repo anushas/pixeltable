@@ -407,9 +407,21 @@ class TestIndex:
         with pytest.raises(pxt.Error) as exc_info:
             img_t.drop_embedding_index(idx_name='doesnotexist')
         assert "index 'doesnotexist' does not exist" in str(exc_info.value).lower()
+        with pytest.raises(pxt.Error) as exc_info:
+            img_t.drop_embedding_index(idx_name='doesnotexist', if_not_exists='error')
+        assert "index 'doesnotexist' does not exist" in str(exc_info.value).lower()
+        img_t.drop_embedding_index(idx_name='doesnotexist', if_not_exists='ignore')
+        with pytest.raises(pxt.Error) as exc_info:
+            img_t.drop_embedding_index(idx_name='doesnotexist', if_not_exists='invalid')
+        assert "if_not_exists must be one of: ['error', 'ignore']" in str(exc_info.value).lower()
 
         with pytest.raises(pxt.Error) as exc_info:
             img_t.drop_embedding_index(column='doesnotexist')
+        assert "column 'doesnotexist' unknown" in str(exc_info.value).lower()
+        # when dropping an index via a column, if_not_exists does not
+        # apply to non-existent column; it will still raise error.
+        with pytest.raises(pxt.Error) as exc_info:
+            img_t.drop_embedding_index(column='doesnotexist', if_not_exists='invalid')
         assert "column 'doesnotexist' unknown" in str(exc_info.value).lower()
         with pytest.raises(AttributeError) as exc_info:
             img_t.drop_embedding_index(column=img_t.doesnotexist)
@@ -421,6 +433,12 @@ class TestIndex:
         with pytest.raises(pxt.Error) as exc_info:
             img_t.drop_embedding_index(column=img_t.img)
         assert "column 'img' does not have an index" in str(exc_info.value).lower()
+        # when dropping an index via a column, if_not_exists applies if
+        # the column does not have any index to drop.
+        with pytest.raises(pxt.Error) as exc_info:
+            img_t.drop_embedding_index(column='img', if_not_exists='error')
+        assert "column 'img' does not have an index" in str(exc_info.value).lower()
+        img_t.drop_embedding_index(column=img_t.img, if_not_exists='ignore')
 
         img_t.add_embedding_index('img', idx_name='embed0', image_embed=clip_img_embed, string_embed=clip_text_embed)
         img_t.add_embedding_index('img', idx_name='embed1', image_embed=clip_img_embed, string_embed=clip_text_embed)
