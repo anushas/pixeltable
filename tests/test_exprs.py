@@ -23,7 +23,7 @@ from pixeltable.functions import cast
 from pixeltable.iterators import FrameIterator
 
 from .utils import (create_all_datatypes_tbl, create_scalars_tbl, get_image_files, reload_catalog, skip_test_if_not_installed,
-                    validate_update_status)
+                    validate_update_status, ReloadTester)
 
 
 class TestExprs:
@@ -101,6 +101,66 @@ class TestExprs:
         with pytest.raises(AttributeError) as excinfo:
             _ = t.does_not_exist
         assert 'unknown' in str(excinfo.value).lower()
+
+    def test_column_ref_context(self, test_tbl: catalog.Table, reload_tester: ReloadTester) -> None:
+        """ Test the table context is setup and works as expected for ColumnRef expression"""
+        t = test_tbl
+        assert t.count() == 100
+
+        v = pxt.create_view('test_view', t.where(t.c2 >= 90), additional_columns={'v1': pxt.Int})
+        assert v.count() == 10
+
+        assert v.select(v.v1).count() == 10
+        assert v.v1.count() == 10
+
+        assert v.select(v.c2).count() == 10
+        assert v.select(v.c2).head(5)['c2'] == [90, 91, 92, 93, 94]
+        assert v.c2.count() == 100 # bug1: should be 10, but is 100
+        assert v.c2.head(5)['c2'] == [0, 1, 2, 3, 4] # bug1: should be [90, 91, 92, 93, 94], but is [0, 1, 2, 3, 4]
+
+        s = pxt.create_snapshot('test_snap1', v.where(v.c2 >=95), additional_columns={'s1': pxt.String})
+        assert s.count() == 5
+
+        assert s.select(s.s1).count() == 5
+        assert s.s1.count() == 5
+
+        assert s.select(s.v1).count() == 5
+        with pytest.raises(excs.Error) as exc_info: # bug2: should find v1, but unable to
+            assert s.v1.count() == 10 # bug1: should be 5, but is 10
+        print(exc_info.value)
+
+        assert s.select(s.c2).count() == 5
+        assert s.select(s.c2).head(3)['c2'] == [95, 96, 97]
+        with pytest.raises(excs.Error) as exc_info: #bug2: should find c2, but unable to
+            assert s.c2.count() == 100 # bug1: should be 5, but is 100
+        with pytest.raises(excs.Error) as exc_info: #bug2: should find c2, but unable to
+            assert s.c2.head(3)['c2'] == [0, 1, 2] # bug1: should be [95, 96, 97], but is [0, 1, 2]?
+
+        s2 = pxt.create_snapshot('test_snap2', v.where(v.c2 >=95))
+        assert s2.count() == 5
+
+        assert s2.select(s2.c2).count() == 5
+        assert s2.select(s2.c2).head(3)['c2'] == [95, 96, 97]
+        with pytest.raises(excs.Error) as exc_info: #bug2: should find c2, but unable to
+            assert s2.c2.count() == 10 # bug1: should be 5, but is 10
+        print(exc_info.value)
+        with pytest.raises(excs.Error) as exc_info: #bug2: should find c2, but unable to
+            assert s2.c2.head(3)['c2'] == [0, 1, 2] # bug1: should be [95, 96, 97], but is [0, 1, 2]
+        print(exc_info.value)
+
+        s3 = pxt.create_snapshot('test_snap3', v)
+        assert s3.count() == 10
+
+        assert s3.select(s3.c2).count() == 10
+        assert s3.select(s3.c2).head(3)['c2'] == [90, 91, 92]
+        with pytest.raises(excs.Error) as exc_info: #bug2: should find c2, but unable to
+            assert s3.c2.count() == 100 # bug1: should be 10, but is 100
+        print(exc_info.value)
+        with pytest.raises(excs.Error) as exc_info: #bug2: should find c2, but unable to
+            assert s3.c2.head(3)['c2'] == [0, 1, 2] # bug1: should be [90, 91, 92], but is [0, 1, 2]
+        print(exc_info.value)
+        # assert exc_info == "Expression 'c2' cannot be evaluated in the context of this query's tables (test_view)"
+
 
     def test_compound_predicates(self, test_tbl: catalog.Table) -> None:
         t = test_tbl
